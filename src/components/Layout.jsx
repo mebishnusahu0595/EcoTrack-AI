@@ -97,12 +97,18 @@ function Layout() {
 
               {currentUser && (
                 <div className="flex items-center space-x-2">
-                  <div className="flex items-center space-x-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                    <User className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                      {currentUser.displayName || currentUser.email || 'User'}
-                    </span>
-                  </div>
+                  <Link to="/profile">
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex items-center space-x-2 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer"
+                    >
+                      <User className="w-4 h-4" />
+                      <span className="text-sm font-medium">
+                        {currentUser.displayName || currentUser.email || 'User'}
+                      </span>
+                    </motion.div>
+                  </Link>
                   <button
                     onClick={logout}
                     className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 text-red-600 transition-colors"

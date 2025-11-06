@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Brain, Sparkles, TrendingDown, Droplet, Leaf, Lightbulb, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Brain, Sparkles, Loader2, Send, MessageCircle, X } from 'lucide-react';
 import EcoTwinAvatar from '../components/EcoTwinAvatar';
 import { useAuth } from '../context/AuthContext';
 import localStorageService from '../services/localStorage';
-import { generateAISuggestions, generateMotivation } from '../services/groqService';
+import { generateAISuggestions, generateMotivation, streamAIResponse } from '../services/groqService';
 
 function AICoach() {
   const [ecoScore, setEcoScore] = useState(50);
@@ -17,11 +17,23 @@ function AICoach() {
     weekProgress: 0,
     recentActivities: []
   });
+  
+  // Chat states
+  const [chatOpen, setChatOpen] = useState(true); // Open by default
+  const [messages, setMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef(null);
   const { currentUser } = useAuth();
 
   useEffect(() => {
     loadUserData();
   }, [currentUser]);
+
+  useEffect(() => {
+    // Scroll to bottom when new messages arrive
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const loadUserData = async () => {
     if (!currentUser) return;
@@ -107,6 +119,57 @@ function AICoach() {
     }
   };
 
+  const handleSendMessage = async () => {
+    if (!userInput.trim() || isTyping) return;
+
+    const userMessage = userInput.trim();
+    setUserInput('');
+    
+    // Add user message
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
+    setIsTyping(true);
+    
+    try {
+      // Create AI message placeholder
+      const aiMessageId = Date.now();
+      setMessages(prev => [...prev, { role: 'assistant', content: '', id: aiMessageId }]);
+      
+      let fullResponse = '';
+      
+      // Stream AI response
+      for await (const chunk of streamAIResponse(userMessage, {
+        ecoScore,
+        waterSaved: stats.waterSaved,
+        carbonReduced: stats.carbonReduced
+      })) {
+        fullResponse += chunk;
+        
+        // Update the AI message with streaming content
+        setMessages(prev => prev.map(msg => 
+          msg.id === aiMessageId 
+            ? { ...msg, content: fullResponse }
+            : msg
+        ));
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <motion.div
@@ -123,97 +186,26 @@ function AICoach() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          {/* Eco Twin & Score */}
+        {/* Eco Twin & Motivation */}
+        <motion.div
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          className="card text-center mb-8 max-w-md mx-auto"
+        >
+          <EcoTwinAvatar ecoScore={ecoScore} size="large" />
+          
           <motion.div
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            className="card text-center"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: 'spring' }}
+            className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 rounded-lg"
           >
-            <EcoTwinAvatar ecoScore={ecoScore} size="large" />
-            
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring' }}
-              className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 rounded-lg"
-            >
-              <Brain className="w-8 h-8 mx-auto mb-2 text-purple-600" />
-              <p className="text-sm text-gray-700 dark:text-gray-300 italic">
-                "{aiMotivation}"
-              </p>
-            </motion.div>
+            <Brain className="w-8 h-8 mx-auto mb-2 text-purple-600" />
+            <p className="text-sm text-gray-700 dark:text-gray-300 italic">
+              "{aiMotivation}"
+            </p>
           </motion.div>
-
-          {/* Stats */}
-          <div className="lg:col-span-2 space-y-4">
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="card bg-gradient-to-r from-eco-blue-50 to-eco-blue-100 dark:from-eco-blue-900 dark:to-eco-blue-800"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-eco-blue-700 dark:text-eco-blue-300 font-medium mb-1">
-                    Water Saved This Week
-                  </p>
-                  <p className="text-4xl font-bold text-eco-blue-600 dark:text-eco-blue-400">
-                    {Math.round(stats.waterSaved)}L
-                  </p>
-                  <p className="text-xs text-eco-blue-600 dark:text-eco-blue-400 mt-1">
-                    vs. average consumption
-                  </p>
-                </div>
-                <TrendingDown className="w-16 h-16 text-eco-blue-500 opacity-50" />
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="card bg-gradient-to-r from-eco-green-50 to-eco-green-100 dark:from-eco-green-900 dark:to-eco-green-800"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-eco-green-700 dark:text-eco-green-300 font-medium mb-1">
-                    Carbon Reduced This Week
-                  </p>
-                  <p className="text-4xl font-bold text-eco-green-600 dark:text-eco-green-400">
-                    {stats.carbonReduced.toFixed(1)}kg
-                  </p>
-                  <p className="text-xs text-eco-green-600 dark:text-eco-green-400 mt-1">
-                    CO₂ emissions prevented
-                  </p>
-                </div>
-                <Leaf className="w-16 h-16 text-eco-green-500 opacity-50" />
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="card bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900 dark:to-pink-900"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-purple-700 dark:text-purple-300 font-medium mb-1">
-                    Tracking Streak
-                  </p>
-                  <p className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                    {stats.weekProgress}
-                  </p>
-                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
-                    logs this week
-                  </p>
-                </div>
-                <Sparkles className="w-16 h-16 text-purple-500 opacity-50" />
-              </div>
-            </motion.div>
-          </div>
-        </div>
+        </motion.div>
 
         {/* AI Suggestions */}
         <motion.div
@@ -265,6 +257,135 @@ function AICoach() {
             </a>
           </div>
         </motion.div>
+
+        {/* AI Chat Button - Floating */}
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 1.5, type: 'spring' }}
+          onClick={() => setChatOpen(!chatOpen)}
+          className="fixed bottom-8 right-8 z-50 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-full shadow-2xl hover:shadow-purple-500/50 transition-all hover:scale-110"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          {chatOpen ? (
+            <X className="w-6 h-6" />
+          ) : (
+            <MessageCircle className="w-6 h-6" />
+          )}
+        </motion.button>
+
+        {/* AI Chat Window */}
+        <AnimatePresence>
+          {chatOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 100, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 100, scale: 0.8 }}
+              transition={{ type: 'spring', damping: 20 }}
+              className="fixed bottom-24 right-8 z-40 w-96 max-w-[calc(100vw-4rem)] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden"
+            >
+              {/* Chat Header */}
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Brain className="w-5 h-5" />
+                  <div>
+                    <h3 className="font-bold">EcoTwin AI</h3>
+                    <p className="text-xs opacity-90">Your Sustainability Assistant</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="hover:bg-white/20 rounded-lg p-1 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Chat Messages */}
+              <div className="h-96 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900">
+                {messages.length === 0 && (
+                  <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                    <Brain className="w-12 h-12 mx-auto mb-3 text-purple-600" />
+                    <p className="text-sm">Ask me anything about sustainability!</p>
+                    <p className="text-xs mt-2">Try: "How can I reduce my water usage?"</p>
+                  </div>
+                )}
+                
+                {messages.map((message, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                        message.role === 'user'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                          : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700'
+                      }`}
+                    >
+                      {message.role === 'assistant' && (
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Brain className="w-4 h-4 text-purple-600" />
+                          <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                            EcoTwin
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                        {message.content}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+                
+                {isTyping && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3">
+                      <div className="flex space-x-2">
+                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+                
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input */}
+              <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Ask me anything..."
+                    disabled={isTyping}
+                    className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 text-sm"
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSendMessage}
+                    disabled={!userInput.trim() || isTyping}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-2 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    <Send className="w-5 h-5" />
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

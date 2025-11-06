@@ -10,6 +10,7 @@ import CarbonTracker from './pages/CarbonTracker';
 import ReportIssue from './pages/ReportIssue';
 import AICoach from './pages/AICoach';
 import Community from './pages/Community';
+import Profile from './pages/Profile';
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -85,6 +86,7 @@ function App() {
               <Route path="report" element={<ReportIssue />} />
               <Route path="coach" element={<AICoach />} />
               <Route path="community" element={<Community />} />
+              <Route path="profile" element={<Profile />} />
             </Route>
           </Routes>
         </Router>
