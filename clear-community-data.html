@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear EcoTrack Community Data</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f9ff;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #22c55e;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+        button {
+            background: #22c55e;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #16a34a;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+        .warning {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Fake Community Data</h1>
+        
+        <div class="warning">
+            ⚠️ <strong>Important:</strong> This will delete ALL community posts and leaderboard data. Your user account and tracking data will remain safe.
+        </div>
+
+        <p>Click the button below to remove all fake/demo community data from your browser's localStorage.</p>
+        
+        <p><strong>What will be cleared:</strong></p>
+        <ul>
+            <li>All community posts</li>
+            <li>Leaderboard data (will be recalculated from your real logs)</li>
+        </ul>
+
+        <p><strong>What will NOT be affected:</strong></p>
+        <ul>
+            <li>Your user account</li>
+            <li>Water tracking logs</li>
+            <li>Carbon tracking logs</li>
+            <li>Reports</li>
+        </ul>
+
+        <button onclick="clearFakeData()">Clear Community Data</button>
+        
+        <div class="success" id="success">
+            ✅ <strong>Success!</strong> Fake community data has been cleared. 
+            <br><br>
+            Now go back to <a href="http://localhost:3000/community" style="color: #059669; font-weight: 600;">http://localhost:3000/community</a> and refresh the page.
+        </div>
+    </div>
+
+    <script>
+        function clearFakeData() {
+            try {
+                // Clear community posts
+                localStorage.removeItem('ecotrack_communityPosts');
+                
+                // Clear leaderboard
+                localStorage.removeItem('ecotrack_leaderboard');
+                
+                // Show success message
+                document.getElementById('success').style.display = 'block';
+                
+                console.log('✅ Community fake data cleared successfully!');
+            } catch (error) {
+                alert('Error clearing data: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
